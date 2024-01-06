@@ -111,13 +111,22 @@ for JJ_a = 1:S.n_atm % loop over all the atoms
 		isImgRc = isImgRc_x && isImgRc_y && isImgRc_z;
 		if(isImgRc)
 			% Starting and ending indices of the nonlocal rc-region
-			ii_rc_s = ceil( (x0_i - rcx)/S.dx) + 1;
-			ii_rc_e = floor((x0_i + rcx)/S.dx) + 1;
-			jj_rc_s = ceil( (y0_i - rcy)/S.dy) + 1;
-			jj_rc_e = floor((y0_i + rcy)/S.dy) + 1;
-			kk_rc_s = ceil( (z0_i - rcz)/S.dz) + 1;
-			kk_rc_e = floor((z0_i + rcz)/S.dz) + 1;
-			
+			if S.Cyclix_flag == 1
+				ii_rc_s = ceil( ((x0_i-S.xin) - rcx)/S.dx) + 1;
+				ii_rc_e = floor(((x0_i-S.xin) + rcx)/S.dx) + 1;
+				jj_rc_s = ceil( ((y0_i-S.yin) - rcy)/S.dy) + 1;
+				jj_rc_e = floor(((y0_i-S.yin) + rcy)/S.dy) + 1;
+				kk_rc_s = ceil( ((z0_i-S.zin) - rcz)/S.dz) + 1;
+				kk_rc_e = floor(((z0_i-S.zin) + rcz)/S.dz) + 1;
+			else
+				ii_rc_s = ceil( (x0_i - rcx)/S.dx) + 1;
+				ii_rc_e = floor((x0_i + rcx)/S.dx) + 1;
+				jj_rc_s = ceil( (y0_i - rcy)/S.dy) + 1;
+				jj_rc_e = floor((y0_i + rcy)/S.dy) + 1;
+				kk_rc_s = ceil( (z0_i - rcz)/S.dz) + 1;
+				kk_rc_e = floor((z0_i + rcz)/S.dz) + 1;
+			end
+
 			ii_rc_s = max(ii_rc_s,1);
 			ii_rc_e = min(ii_rc_e,S.Nx);
 			jj_rc_s = max(jj_rc_s,1);
@@ -179,7 +188,7 @@ for JJ_a = 1:S.n_atm % loop over all the atoms
 				rc_XX = bsxfun(@minus,pos_node_cart(:,1),pos_atm_cart(:,1));
 				rc_YY = bsxfun(@minus,pos_node_cart(:,2),pos_atm_cart(:,2));
 				rc_ZZ = bsxfun(@minus,pos_node_cart(:,3),pos_atm_cart(:,3));
-				if (S.cell_typ == 3 || S.cell_typ == 4 || S.cell_typ == 5)
+				if S.Cyclix_flag == 1
 					fac1 = (y0-y0_i)/S.L2;
 					fac2 = (z0-z0_i)/S.L3;
 					ROT = (S.RotM1^fac1) * (S.RotM2^fac2);
