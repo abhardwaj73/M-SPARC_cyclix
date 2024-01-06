@@ -10,7 +10,7 @@ function DG = blochGradient(S,kptvec,grad_dir)
 % @copyright (c) 2019 Material Physics & Mechanics Group, Georgia Tech
 %===================================================================================
 
-if S.cell_typ < 3
+if S.Cyclix_flag == 1
 
 	if (grad_dir == 1)
 		I = S.G_I_1;

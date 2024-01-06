@@ -81,13 +81,22 @@ for JJ_a = 1:S.n_atm % loop over all the atoms
 		%************************************************************************
 		%*          Calculate b, b_ref, Eself, Eself_ref and rho_at             *
 		%************************************************************************
-		% Starting and ending indices of b-region
-		ii_s = ceil ((x0_i - S.Atm(count_typ).rb_x)/S.dx) + 1;
-		ii_e = floor((x0_i + S.Atm(count_typ).rb_x)/S.dx) + 1;
-		jj_s = ceil ((y0_i - S.Atm(count_typ).rb_y)/S.dy) + 1;
-		jj_e = floor((y0_i + S.Atm(count_typ).rb_y)/S.dy) + 1;
-		kk_s = ceil ((z0_i - S.Atm(count_typ).rb_z)/S.dz) + 1;
-		kk_e = floor((z0_i + S.Atm(count_typ).rb_z)/S.dz) + 1;
+		if S.Cyclix_flag == 1
+			ii_s = ceil (((x0_i-S.xin) - S.Atm(count_typ).rb_x)/S.dx) + 1;
+			ii_e = floor(((x0_i-S.xin) + S.Atm(count_typ).rb_x)/S.dx) + 1;
+			jj_s = ceil (((y0_i-S.yin) - S.Atm(count_typ).rb_y)/S.dy) + 1;
+			jj_e = floor(((y0_i-S.yin) + S.Atm(count_typ).rb_y)/S.dy) + 1;
+			kk_s = ceil (((z0_i-S.zin) - S.Atm(count_typ).rb_z)/S.dz) + 1;
+			kk_e = floor(((z0_i-S.zin) + S.Atm(count_typ).rb_z)/S.dz) + 1;
+		else
+			% Starting and ending indices of b-region
+			ii_s = ceil ((x0_i - S.Atm(count_typ).rb_x)/S.dx) + 1;
+			ii_e = floor((x0_i + S.Atm(count_typ).rb_x)/S.dx) + 1;
+			jj_s = ceil ((y0_i - S.Atm(count_typ).rb_y)/S.dy) + 1;
+			jj_e = floor((y0_i + S.Atm(count_typ).rb_y)/S.dy) + 1;
+			kk_s = ceil ((z0_i - S.Atm(count_typ).rb_z)/S.dz) + 1;
+			kk_e = floor((z0_i + S.Atm(count_typ).rb_z)/S.dz) + 1;
+		end
 		
 		% Check if the b-region is inside the domain in Dirichlet BC
 		% direction
