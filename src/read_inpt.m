@@ -87,7 +87,7 @@ while(~feof(fid1))
 		textscan(fid1,'%s',1,'delimiter','\n','MultipleDelimsAsOne',0); % skip current line       
 	elseif (strcmp(str,'TWIST_ANGLE:'))
 		C_param = textscan(fid1,'%f',1,'delimiter',' ','MultipleDelimsAsOne',1);
-		S.alph = C_param{1}; % in radian/Bohr
+		S.twist = C_param{1}; % in radian/Bohr
 		textscan(fid1,'%s',1,'delimiter','\n','MultipleDelimsAsOne',0); % skip current line
 	elseif (strcmp(str,'LATVEC:'))
 		C_param = textscan(fid1,'%f %f %f',1,'delimiter',' ','MultipleDelimsAsOne',1);
@@ -121,6 +121,7 @@ while(~feof(fid1))
 			S.BCy = 1;
 		elseif bcy == 'c' || bcy == 'C'
 			S.BCy = 0;
+			S.BC = 5;
 			S.cell_typ = 3;
 		end
 
@@ -132,10 +133,18 @@ while(~feof(fid1))
 			S.BCz = 0;
 			if(S.cell_typ == 3)
 				S.cell_typ = 5;
+				S.BC = 7;
 			else
 				S.cell_typ = 4;
+				S.BC = 6;
 			end
 		end
+
+		if (S.cell_typ == 3 || S.cell_typ == 4 || S.cell_typ == 5)
+			S.Cyclix_flag == 1
+		else
+			S.Cyclix_flag == 0
+	  end
 		textscan(fid1,'%s',1,'delimiter','\n','MultipleDelimsAsOne',0); % skip current line
 	elseif (strcmp(str,'SPIN_TYP:'))
 		C_param = textscan(fid1,'%f',1,'delimiter',' ','MultipleDelimsAsOne',1);

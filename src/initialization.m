@@ -46,7 +46,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function S = Calculate_rb(S)
 % Starting and ending indices of b-region
-if (S.cell_typ == 1 || S.cell_typ == 2)
+if S.Cyclix_flag ~= 1
 	pos_atm_x = 0; % atom location in x-direction
 	pos_atm_y = 0; % atom location in y-direction
 	pos_atm_z = 0; % atom location in z-direction
@@ -55,12 +55,12 @@ if (S.cell_typ == 1 || S.cell_typ == 2)
 	rb_up_z = (S.dz < 1.5) * (10+10*S.dz) + (S.dz >=1.5) * (20*S.dz-9.5);
 	f_rby = @(y) y;
     
-elseif (S.cell_typ == 3 || S.cell_typ == 4 || S.cell_typ == 5)
+else
 	pos_atm_x = S.xmax_at; % maximum R coordinate of any atom
 	pos_atm_y = 0; % atom location in theta-direction
 	pos_atm_z = 0; % atom location in z-direction
 	rb_up_x = S.xvac; % Radial direction vacuum
-	f_rby = @(y) acos(1 - y^2/(2*pos_atm_x^2));
+	f_rby = @(y) acos(1 - y^2/(2*pos_atm_x^2)) + S.twist*y*0.5;
 	rb_up_y = f_rby(12); % Theta direction
 	rb_up_z = 12; % z-direction
 	
@@ -81,7 +81,7 @@ Nz = (kk_e_temp-kk_s_temp)+1;
 % Find distances
 dd_temp = calculateDistance(XX_3D_temp,YY_3D_temp,ZZ_3D_temp,pos_atm_x,pos_atm_y,pos_atm_z,S);
 
-% Find integration weights
+% Find integration weights (cyclix add here?)
 W_temp = IntgWts(Nx,Ny,Nz,1,1,1,xx_temp(S.FDn+1),S); % 1 - dirichlet BC on the boundary nodes
 W_temp = reshape(W_temp,Nx,Ny,Nz);
 
@@ -110,18 +110,32 @@ for ityp = 1:S.n_typ
     rb_y = ceil(rb_y/S.dy-1e-12)*S.dy;
     rb_z = ceil(rb_z/S.dz-1e-12)*S.dz;
 	fprintf(' Finding rb for %s ...\n',S.Atm(ityp).typ);
-	while (err_rb > S.pseudocharge_tol && count <= 100 && rb_x <= rb_up_x && rb_y <= rb_up_y && rb_z <= rb_up_z )
-		rb_x = rb_x + S.dx;
-		rb_z = rb_z + S.dz;
-		rb_y = f_rby(max(rb_x,rb_z));
-		ii_rb = -1*ii_s_temp+S.FDn-floor(rb_x/S.dx)+1:-1*ii_s_temp+S.FDn+floor(rb_x/S.dx)+1;
-		jj_rb = -1*jj_s_temp+S.FDn-floor(rb_y/S.dy)+1:-1*jj_s_temp+S.FDn+floor(rb_y/S.dy)+1;
-		kk_rb = S.FDn+1:S.FDn+floor(rb_z/S.dz)+1; 
-		err_rb = abs(sum(sum(sum(W_temp(ii_rb-S.FDn,jj_rb-S.FDn,kk_rb-S.FDn).*b_temp(ii_rb,jj_rb,kk_rb))))*2 + S.Atm(ityp).Z);
-		fprintf(' rb = {%.3f %.3f %.3f}, int_b = %.15f, err_rb = %.3e\n',rb_x,rb_y,rb_z,2*sum(sum(sum(W_temp(ii_rb-S.FDn,jj_rb-S.FDn,kk_rb-S.FDn).*b_temp(ii_rb,jj_rb,kk_rb)))),err_rb);
-		count = count + 1;
-	end
-	
+   if S.Cyclix_flag == 1
+	 	while (err_rb > S.pseudocharge_tol && count <= 300 && rb_x <= rb_up_x && rb_y <= rb_up_y && rb_z <= rb_up_z )
+			 rb_x = rb_x + ds;
+			 rb_z = rb_z + ds;
+			 rb_y = f_rby(rb_z);
+			 ii_rb = -1*ii_s_temp+S.FDn-floor(rb_x/S.dx)+1:-1*ii_s_temp+S.FDn+floor(rb_x/S.dx)+1;
+			 jj_rb = -1*jj_s_temp+S.FDn-floor(rb_y/S.dy)+1:-1*jj_s_temp+S.FDn+floor(rb_y/S.dy)+1;
+			 kk_rb = S.FDn+1:S.FDn+floor(rb_z/S.dz)+1;
+			 err_rb = abs(sum(sum(sum(W_temp(ii_rb-S.FDn,jj_rb-S.FDn,kk_rb-S.FDn).*b_temp(ii_rb,jj_rb,kk_rb))))*2 + S.Atm(ityp).Z);
+			 fprintf(' rb = {%.3f %.3f %.3f}, int_b = %.15f, err_rb = %.3e\n',rb_x,rb_y,rb_z,2*sum(sum(sum(W_temp(ii_rb-S.FDn,jj_rb-S.FDn,kk_rb-S.FDn).*b_temp(ii_rb,jj_rb,kk_rb)))),err_rb);
+			 count = count + 1;
+	 	 end
+	else
+		while (err_rb > S.pseudocharge_tol && count <= 100 && rb_x <= rb_up_x && rb_y <= rb_up_y && rb_z <= rb_up_z )
+			rb_x = rb_x + S.dx;
+			rb_z = rb_z + S.dz;
+			rb_y = f_rby(max(rb_x,rb_z));
+			ii_rb = -1*ii_s_temp+S.FDn-floor(rb_x/S.dx)+1:-1*ii_s_temp+S.FDn+floor(rb_x/S.dx)+1;
+			jj_rb = -1*jj_s_temp+S.FDn-floor(rb_y/S.dy)+1:-1*jj_s_temp+S.FDn+floor(rb_y/S.dy)+1;
+			kk_rb = S.FDn+1:S.FDn+floor(rb_z/S.dz)+1;
+			err_rb = abs(sum(sum(sum(W_temp(ii_rb-S.FDn,jj_rb-S.FDn,kk_rb-S.FDn).*b_temp(ii_rb,jj_rb,kk_rb))))*2 + S.Atm(ityp).Z);
+			fprintf(' rb = {%.3f %.3f %.3f}, int_b = %.15f, err_rb = %.3e\n',rb_x,rb_y,rb_z,2*sum(sum(sum(W_temp(ii_rb-S.FDn,jj_rb-S.FDn,kk_rb-S.FDn).*b_temp(ii_rb,jj_rb,kk_rb)))),err_rb);
+			count = count + 1;
+		end
+
+	end	
 	assert(rb_x<=rb_up_x && rb_y<=rb_up_y && rb_z<=rb_up_z,'Need to increase upper bound for rb!');
 	S.Atm(ityp).rb_x = rb_x;
 	S.Atm(ityp).rb_y = rb_y;
@@ -262,7 +276,7 @@ end
 S.Atoms_init = S.Atoms;
 
 % Cychel parameters
-if (S.cell_typ == 3 || S.cell_typ == 4 || S.cell_typ == 5)
+if S.Cyclix_flag == 1
 	% Add the folder containing all the Cychel files to the path
 	addpath('../Cychel');
 	count_prev = 0;
@@ -295,7 +309,7 @@ if (S.cell_typ == 3 || S.cell_typ == 4 || S.cell_typ == 5)
 	% Rotational matrix
 	theta1 = S.L2;
 	S.RotM1 = [cos(theta1),-sin(theta1),0; sin(theta1),cos(theta1),0; 0 0 1];
-	theta2 = S.alph*S.L3;
+	theta2 = S.twist*S.L3;
 	S.RotM2 = [cos(theta2),-sin(theta2),0; sin(theta2),cos(theta2),0; 0 0 1];
 end
 
@@ -442,8 +456,17 @@ if S.BC >= 0    % if user provides BOUNDARY_CONDITION: 1-4
 	elseif(S.BC == 4)
 		%S.BCx = 0; S.BCy = 1; S.BCz = 1;
 		S.BCx = 1; S.BCy = 1; S.BCz = 0;
+	elseif(S.BC == 5)
+		S.BCx = 1; S.BCy = 0; S.BCz = 0;
+		S.cell_typ = 3;
+	elseif(S.BC == 6)
+		S.BCx = 1; S.BCy = 1; S.BCz = 0;
+		S.cell_typ = 4;
+	elseif(S.BC == 7)
+		S.BCx = 1; S.BCy = 0; S.BCz = 0;
+		S.cell_typ = 5;		
 	else
-		error('Boundary condition should be one among {1,2,3,4}');
+		error('Boundary condition should be one among {1,2,3,4,5,6,7}');
 	end
 elseif S.BCx >= 0 && S.BCy >= 0 && S.BCz >= 0 % if user provides BCx,BCy,BCz
 	n_Dirichlet = S.BCx + S.BCy + S.BCz;
@@ -497,8 +520,12 @@ Nx = S.Nx; Ny = S.Ny; Nz = S.Nz;
 S.N = S.Nx * S.Ny * S.Nz;
 
 % map atom positions back to domain for periodic domain	
-% in x direction	
-isAtomOutx = sum(S.Atoms(:,1) < 0 | S.Atoms(:,1) >= S.L1) > 0;	
+% in x direction
+if Cyclix_flag == 1
+	isAtomOutx = sum(S.Atoms(:,1) <= S.xin | S.Atoms(:,1) >= S.xout);
+else
+	isAtomOutx = sum(S.Atoms(:,1) < 0 | S.Atoms(:,1) >= S.L1) > 0;
+end	
 if (isAtomOutx)	
 	if S.BCx == 0	
 		S.Atoms(:,1) = mod(S.Atoms(:,1), S.L1);	
@@ -512,6 +539,7 @@ if (isAtomOutx)
 end	
 % in y direction	
 isAtomOuty = sum(S.Atoms(:,2) < 0 | S.Atoms(:,2) >= S.L2) > 0;	
+isAtomOuty = isAtomOuty * (S.cell_typ < 4);
 if (isAtomOuty)	
 	if S.BCy == 0	
 		S.Atoms(:,2) = mod(S.Atoms(:,2), S.L2);	
@@ -562,7 +590,7 @@ S.w1 = w1;
 
 % Weights for spatial integration over domain
 % S.W = IntgWts(S.Nx,S.Ny,S.Nz,S.BCx,S.BCy,S.BCz,S.xin,S);
-if S.cell_typ == 1 || S.cell_typ == 2
+if S.Cyclix_flag ~= 1
 	S.W = ones(S.N,1) * (S.dx*S.dy*S.dz*S.Jacb);
 else
 	S.W = IntgWts(S.Nx,S.Ny,S.Nz,S.BCx,S.BCy,S.BCz,S.xin,S);
@@ -626,12 +654,12 @@ end
 % set default values to the same default as SPARC %
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % first find effective mesh size
-if S.cell_typ < 3
+if S.Cyclix_flag ~= 1
 	dx2_inv = 1/(S.dx * S.dx);
 	dy2_inv = 1/(S.dy * S.dy);
 	dz2_inv = 1/(S.dz * S.dz);
 	h_eff = sqrt(3.0 / (dx2_inv + dy2_inv + dz2_inv));
-elseif (S.cell_typ == 3 || S.cell_typ == 4 || S.cell_typ == 5)
+else
 	dx2_inv = 1/(S.dx * S.dx);
 	dy2_inv = 1/(((S.xin+S.xout)/2)*S.dy)^2;
 	dz2_inv = 1/(S.dz * S.dz);
@@ -839,7 +867,7 @@ S = gradIndicesValues(S);
 
 % Calculate discrete laplacian
 [DL11,DL22,DL33,DG1,DG2,DG3] = blochLaplacian_1d(S,[0 0 0]);
-if S.cell_typ < 3
+if S.Cyclix_flag ~= 1
 	S.Lap_std = S.lapc_T(1,1) * kron(speye(S.Nz),kron(speye(S.Ny),DL11))  +  S.lapc_T(2,2) * kron(speye(S.Nz),kron(DL22,speye(S.Nx))) + ...
 				S.lapc_T(3,3) * kron(DL33,kron(speye(S.Ny),speye(S.Nx))) ;
 	if (S.cell_typ == 2)
@@ -847,7 +875,7 @@ if S.cell_typ < 3
 			  S.lapc_T(1,3) * kron(DG3,kron(speye(S.Ny),DG1)) ;
 		S.Lap_std = S.Lap_std + MDL;
 	end
-elseif (S.cell_typ == 3 || S.cell_typ == 4 || S.cell_typ == 5)
+else
 	S.Lap_std = kron(speye(S.Nz),kron(speye(S.Ny),(DL11+DG1))) + kron(DL33,kron(speye(S.Ny),speye(S.Nx))) + ...
 				kron(speye(S.Nz),kron(DL22,S.R2inv));
 	if (S.cell_typ == 4 || S.cell_typ == 5)
@@ -860,6 +888,10 @@ end
 S.grad_1 = blochGradient(S,[0 0 0],1);
 S.grad_2 = blochGradient(S,[0 0 0],2);	
 S.grad_3 = blochGradient(S,[0 0 0],3);
+
+if S.xc == 2 && (S.Cyclix_flag == 1)
+	[S.div_gradvec_1, S.div_gradvec_2] = div_gradvec_cychel(S,[0 0 0]);
+end
 
 % Calculate preconditioners for negative discrete laplacian
 [S.LapPreconL, S.LapPreconU] = ilu(S.Lap_std,struct('droptol',1e-5));
@@ -1125,7 +1157,7 @@ S = struct(...
 	'Temp',Temp,'bet',bet,'npl',npl,'FDn',FDn,...
 	'rc_ref',rc_ref,'max_relax_it',max_relax_it,...
 	'dbg_switch',dbg_switch,'xc',xc,...
-	'Nelectron',Nelectron,'n_typ',n_typ);
+	'Nelectron',Nelectron,'n_typ',n_typ,Cyclix_flag);
 
 S.TimeRevSym = 1; 
 
@@ -1229,7 +1261,7 @@ S.yin = 0;
 S.zin = 0;
 
 % Cychel
-S.alph = 0.0;
+S.twist = 0.0;
 
 % SOC
 S.SOC_flag = 0;
@@ -1307,16 +1339,29 @@ else
 	fprintf(fileID,'%.15f %.15f %.15f \n',S.lat_vec(2,:));
 	fprintf(fileID,'%.15f %.15f %.15f \n',S.lat_vec(3,:));
 end
-
+if S.Cyclix_flag == 1
+    fprintf(fileID,'TWIST_ANGLE: %f \n',S.twist);
+end
 fprintf(fileID,'FD_GRID: %d %d %d\n',S.Nx-S.BCx,S.Ny-S.BCy,S.Nz-S.BCz);
 fprintf(fileID,'FD_ORDER: %d\n',S.FDn*2);
 %fprintf(fileID,'BOUNDARY_CONDITION: %d\n',S.BC);
-str_BC = ['P', 'D'];
-fprintf(fileID,'BC:');
-fprintf(fileID,' %s',str_BC(S.BCx+1));
-fprintf(fileID,' %s',str_BC(S.BCy+1));
-fprintf(fileID,' %s',str_BC(S.BCz+1));
-fprintf(fileID,'\n');
+if (S.Cyclix_flag ~= 1)
+	str_BC = ['P', 'D'];
+	fprintf(fileID,'BC:');
+	fprintf(fileID,' %s',str_BC(S.BCx+1));
+	fprintf(fileID,' %s',str_BC(S.BCy+1));
+	fprintf(fileID,' %s',str_BC(S.BCz+1));
+	fprintf(fileID,'\n');
+else 
+	str_BC = ['P', 'D'];
+	fprintf(fileID,'BC:');
+	fprintf(fileID,' %s',str_BC(S.BCx+1));
+	str_BC = ['C', 'D'];
+	fprintf(fileID,' %s',str_BC(S.BCy+1));
+	str_BC = ['H','P'];
+	fprintf(fileID,' %s',str_BC(1+isequal(S.BC,5)));
+	fprintf(fileID,'\n');
+end
 if (S.BC==2 || S.BC==3 || S.BC==4)
 	fprintf(fileID,'KPOINT_GRID: %d %d %d\n',S.nkpt);
 	fprintf(fileID,'KPOINT_SHIFT: %d %d %d\n',S.kptshift);
@@ -1555,12 +1600,16 @@ fprintf(fileID,'****************************************************************
 % fprintf(fileID,'Number of processors               :  %d\n',nproc);
 
 if ( (abs(S.dx-S.dy) <=1e-12) && (abs(S.dx-S.dz) <=1e-12) ...
-	&& (abs(S.dy-S.dz) <=1e-12) ) 
-	fprintf(fileID,'Mesh spacing                       : % f (Bohr)\n',S.dx); 
+	&& (abs(S.dy-S.dz) <=1e-12) )
+	fprintf(fileID,'Mesh spacing                       : % f (Bohr)\n',S.dx);
 else
-	fprintf(fileID,'Mesh spacing in x-direction        : % f (Bohr)\n',S.dx); 
-	fprintf(fileID,'Mesh spacing in y-direction        : % f (Bohr)\n',S.dy); 
-	fprintf(fileID,'Mesh spacing in z direction        : % f (Bohr)\n',S.dz);     
+	fprintf(fileID,'Mesh spacing in x-direction        : % f (Bohr)\n',S.dx);
+	if(S.Cyclix_flag ~= 1)
+		fprintf(fileID,'Mesh spacing in y-direction        : % f (Bohr)\n',S.dy);
+	else
+		fprintf(fileID,'Mesh spacing in y-direction        : % f (Bohr)\n',S.dy*(S.xin+S.xout)/2);
+	end
+	fprintf(fileID,'Mesh spacing in z direction        : % f (Bohr)\n',S.dz);
 end
 
 if (S.BC==2 || S.BC==3 || S.BC==4) 
@@ -1804,7 +1853,7 @@ end
 end
 
 function [W] = IntgWts(Nx,Ny,Nz,BCx,BCy,BCz,xin,S)
-	if S.cell_typ == 1 || S.cell_typ == 2
+	if S.Cyclix_flag ~= 1
 		W_x = ones(Nx,1)*S.dx;
 		W_x(1) = W_x(1) * (1-BCx*0.5);
 		W_x(Nx) = W_x(Nx) * (1-BCx*0.5);
@@ -1818,7 +1867,7 @@ function [W] = IntgWts(Nx,Ny,Nz,BCx,BCy,BCz,xin,S)
 		W_z(Nz) = W_z(Nz) * (1-BCz*0.5);
 
 		W = kron(W_z,kron(W_y,W_x)) * S.Jacb;
-	elseif (S.cell_typ == 3 || S.cell_typ == 4 || S.cell_typ == 5)
+	else
 		W = IntgWts_cychel(Nx,Ny,Nz,BCx,BCy,BCz,xin,S);
 	end
 end
@@ -1841,31 +1890,37 @@ function [S] = Generate_kpts(S)
     MPG_typ1 = @(nkpt) (-floor((nkpt - 1)/2):(-floor((nkpt - 1)/2)+nkpt-1));
 	MPG_typ2 = @(nkpt) (0:nkpt-1); % MP grid points for finite group order
 
-	if S.cell_typ < 3
+	if S.Cyclix_flag ~= 1
 		kptgrid_x = (1/nkpt(1)) * MPG_typ1(nkpt(1));
 		kptgrid_y = (1/nkpt(2)) * MPG_typ1(nkpt(2));
 		kptgrid_z = (1/nkpt(3)) * MPG_typ1(nkpt(3));
 		sumx = 0;
-		sumy = 0; 
+		sumy = 0;
 		sumz = 0;
-		% shift kpoint grid 
+		% shift kpoint grid
 		kptgrid_x = kptgrid_x + S.kptshift(1) * (1/nkpt(1));
 		kptgrid_y = kptgrid_y + S.kptshift(2) * (1/nkpt(2));
 		kptgrid_z = kptgrid_z + S.kptshift(3) * (1/nkpt(3));
-	
+
 		% map k-points back to BZ
 		temp_epsilon = eps; % include the right boundary k-points instead of left
 		kptgrid_x = mod(kptgrid_x + 0.5 - temp_epsilon, 1) - 0.5 + temp_epsilon;
 		kptgrid_y = mod(kptgrid_y + 0.5 - temp_epsilon, 1) - 0.5 + temp_epsilon;
 		kptgrid_z = mod(kptgrid_z + 0.5 - temp_epsilon, 1) - 0.5 + temp_epsilon;
-	elseif (S.cell_typ == 3 || S.cell_typ == 4 || S.cell_typ == 5)
+	else
 		kptgrid_x = (1/nkpt(1)) * MPG_typ1(nkpt(1));
 		kptgrid_y = (1/nkpt(2)) * MPG_typ2(nkpt(2));
 		kptgrid_z = (1/nkpt(3)) * MPG_typ1(nkpt(3));
+
+		temp_epsilon = eps; % include the right boundary k-points instead of left
+		kptgrid_z = kptgrid_z + S.kptshift(3)*(1/nkpt(3));
+		kptgrid_z = mod(kptgrid_z + 0.5 - temp_epsilon, 1) - 0.5 + temp_epsilon;
+
 		sumx = 0;
-		sumy = nkpt(2); 
+		%sumy = nkpt(2);
+		sumy = (2*pi/S.L2);
 		sumz = 0;
-	end    
+	end  
 	
 	% Scale kpoints
 	kptgrid_x = (2*pi/S.L1) * kptgrid_x;
