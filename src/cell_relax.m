@@ -13,14 +13,23 @@ function S = cell_relax(S)
 % S.max_dilatation = 1.2;
 
 % relax cell in the periodic dims
-S.cellrelax_dims = [1-S.BCx, 1-S.BCy, 1-S.BCz];
+if S.Cyclix_flag == 1
+	S.cellrelax_dims = [0, 0, 1];
+else
+	S.cellrelax_dims = [1-S.BCx, 1-S.BCy, 1-S.BCz];
+end
 S.cellrelax_ndim = sum(S.cellrelax_dims);
 
 if S.cellrelax_ndim < 1
 	error('Cell relaxation is not allowed for isolated systems!');
 end
 
-V = S.L1 * S.L2 * S.L3; % volume
+if S.Cyclix_flag == 1
+	V = S.L1 * (S.xin+S.xout)/2*S.L2 * S.L3;
+	S.twistpercell = S.twist * S.L3;
+else
+    V = S.L1 * S.L2 * S.L3 * S.Jacb; % volume
+end
 
 lower_bound =  V / S.max_dilatation;
 upper_bound =  V * S.max_dilatation;
@@ -28,7 +37,11 @@ upper_bound =  V * S.max_dilatation;
 [optVol,S,~] = Brent(@volume_relax_fun, S, lower_bound, upper_bound, 1e-4, S.TOL_RELAX_CELL, S.max_relax_it);
 
 % cell size related to optimal volume
-V_old = S.L1 * S.L2 * S.L3;
+if S.Cyclix_flag == 1
+    V_old = S.L1 * (S.xin+S.xout)/2*S.L2 * S.L3;
+else
+    V_old = S.L1 * S.L2 * S.L3 * S.Jacb; % volume
+end
 scal = nthroot(optVol / V_old, S.cellrelax_ndim);
 if S.cellrelax_dims(1) == 1
 	S.L1 = S.L1 * scal;
@@ -108,7 +121,11 @@ if Vol <= 0.0
 	error('Volume has become 0 or negative!');
 end
 
-Vol_old = S.L1 * S.L2 * S.L3; % old volume
+if S.Cyclix_flag == 1
+    Vol_old = S.L1 * (S.xin+S.xout)/2*S.L2 * S.L3;
+else
+    Vol_old = S.L1 * S.L2 * S.L3 * S.Jacb; % volume
+end
 
 % scaling factor
 scal = nthroot(Vol / Vol_old, S.cellrelax_ndim);
@@ -152,6 +169,9 @@ if S.cellrelax_dims(3) == 1
 	end
 end
 
+if S.Cyclix_flag == 1
+    S.twist = S.twistpercell/S.L3;
+end
 
 % update mesh size
 if S.cellrelax_dims(1) == 1
@@ -163,15 +183,19 @@ end
 if S.cellrelax_dims(3) == 1
 	S.dz = S.dz * scal;
 end
-S.dV = S.dx * S.dy * S.dz * S.Jacb;
+if S.Cyclix_flag == 1
+    S.dV = S.dx * (S.xin+S.xout)/2*S.dy * S.dz;
+else
+    S.dV = S.dx * S.dy * S.dz * S.Jacb;
+end
 
 % Weights for spatial integration over domain
 % Weights for spatial integration over domain
 % S.W = IntgWts(S.Nx,S.Ny,S.Nz,S.BCx,S.BCy,S.BCz,S.xin,S);
-if S.cell_typ == 1 || S.cell_typ == 2
-	S.W = ones(S.N,1) * (S.dx*S.dy*S.dz*S.Jacb);
-else
+if S.Cyclix_flag == 1
 	S.W = IntgWts(S.Nx,S.Ny,S.Nz,S.BCx,S.BCy,S.BCz,S.xin,S);
+else
+	S.W = ones(S.N,1) * (S.dx*S.dy*S.dz*S.Jacb);
 end
 % Brillouin-Zone Sampling
 S = Generate_kpts(S);
@@ -227,6 +251,7 @@ if (S.BCx == 1 && S.BCy == 1 && S.BCz == 1)
 	S.SH = SH;
 end
 
+if S.Cyclix_flag ~= 1
 % first find effective mesh size
 dx2_inv = 1/(S.dx * S.dx);
 dy2_inv = 1/(S.dy * S.dy);
@@ -256,7 +281,7 @@ if S.cell_typ < 3
 			  S.lapc_T(1,3) * kron(DG3,kron(speye(S.Ny),DG1)) ;
 		S.Lap_std = S.Lap_std + MDL;
 	end
-elseif (S.cell_typ == 3 || S.cell_typ == 4 || S.cell_typ == 5)
+elseif (S.cell_typ == 3 || S.cell_typ == 4 || S.cell_typ == 5) % Cyclix case
 	S.Lap_std = kron(speye(S.Nz),kron(speye(S.Ny),(DL11+DG1))) + kron(DL33,kron(speye(S.Ny),speye(S.Nx))) + ...
 				kron(speye(S.Nz),kron(DL22,S.R2inv));
 	if (S.cell_typ == 4 || S.cell_typ == 5)
@@ -401,7 +426,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function S = Calculate_rb(S)
 % Starting and ending indices of b-region
-if (S.cell_typ == 1 || S.cell_typ == 2)
+if Cyclix_flag ~= 1
 	pos_atm_x = 0; % atom location in x-direction
 	pos_atm_y = 0; % atom location in y-direction
 	pos_atm_z = 0; % atom location in z-direction
@@ -410,7 +435,7 @@ if (S.cell_typ == 1 || S.cell_typ == 2)
 	rb_up_y = f_rby(12);
 	rb_up_z = 12;
 	
-elseif (S.cell_typ == 3 || S.cell_typ == 4 || S.cell_typ == 5)
+else
 	pos_atm_x = S.xmax_at; % maximum R coordinate of any atom
 	pos_atm_y = 0; % atom location in theta-direction
 	pos_atm_z = 0; % atom location in z-direction
@@ -492,7 +517,7 @@ end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function [W] = IntgWts(Nx,Ny,Nz,BCx,BCy,BCz,xin,S)
-	if S.cell_typ == 1 || S.cell_typ == 2
+	if S.Cyclix_flag ~= 1
 		W_x = ones(Nx,1)*S.dx;
 		W_x(1) = W_x(1) * (1-BCx*0.5);
 		W_x(Nx) = W_x(Nx) * (1-BCx*0.5);
@@ -506,7 +531,7 @@ function [W] = IntgWts(Nx,Ny,Nz,BCx,BCy,BCz,xin,S)
 		W_z(Nz) = W_z(Nz) * (1-BCz*0.5);
 
 		W = kron(W_z,kron(W_y,W_x)) * S.Jacb;
-	elseif (S.cell_typ == 3 || S.cell_typ == 4 || S.cell_typ == 5)
+	else
 		W = IntgWts_cychel(Nx,Ny,Nz,BCx,BCy,BCz,xin,S);
 	end
 end
@@ -531,9 +556,13 @@ function PrintCellRelax(S)
 	fprintf(fileID,'%18.10E %18.10E %18.10E \n',S.lat_vec(2,:));
 	fprintf(fileID,'%18.10E %18.10E %18.10E \n',S.lat_vec(3,:));
 	fprintf(fileID,':STRESS:\n');
-	fprintf(fileID,'%18.10E %18.10E %18.10E \n',S.Stress(1,:));
-	fprintf(fileID,'%18.10E %18.10E %18.10E \n',S.Stress(2,:));
-	fprintf(fileID,'%18.10E %18.10E %18.10E \n',S.Stress(3,:));
+	if S.Cyclix_flag ~= 1
+		fprintf(fileID,'%18.10E %18.10E %18.10E \n',S.Stress(1,:));
+		fprintf(fileID,'%18.10E %18.10E %18.10E \n',S.Stress(2,:));
+		fprintf(fileID,'%18.10E %18.10E %18.10E \n',S.Stress(3,:));
+	else
+		 fprintf(fileID,'%18.10E \n',S.Stress(1,:));
+	end
 	
 	fclose(fileID);
 end
@@ -557,7 +586,7 @@ function [S] = Generate_kpts(S)
 	MPG_typ1 = @(nkpt) (2*(1:nkpt) - nkpt - 1)/2; % MP grid points for infinite group order
 	MPG_typ2 = @(nkpt) (0:nkpt-1); % MP grid points for finite group order
 
-	if S.cell_typ < 3
+	if S.Cyclix_flag ~= 1
 		kptgrid_x = (1/nkpt(1)) * MPG_typ1(nkpt(1));
 		kptgrid_y = (1/nkpt(2)) * MPG_typ1(nkpt(2));
 		kptgrid_z = (1/nkpt(3)) * MPG_typ1(nkpt(3));
@@ -574,7 +603,7 @@ function [S] = Generate_kpts(S)
 		kptgrid_x = mod(kptgrid_x + 0.5 - temp_epsilon, 1) - 0.5 + temp_epsilon;
 		kptgrid_y = mod(kptgrid_y + 0.5 - temp_epsilon, 1) - 0.5 + temp_epsilon;
 		kptgrid_z = mod(kptgrid_z + 0.5 - temp_epsilon, 1) - 0.5 + temp_epsilon;
-	elseif (S.cell_typ == 3 || S.cell_typ == 4 || S.cell_typ == 5)
+	else
 		kptgrid_x = (1/nkpt(1)) * MPG_typ1(nkpt(1));
 		kptgrid_y = (1/nkpt(2)) * MPG_typ2(nkpt(2));
 		kptgrid_z = (1/nkpt(3)) * MPG_typ1(nkpt(3));
